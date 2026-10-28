@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 340" width="900" height="340">
+  <defs>
+    <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4fe0a8" stop-opacity=".35"/><stop offset="1" stop-color="#4fe0a8" stop-opacity="0"/>
+    </linearGradient>
+    <clipPath id="reveal"><rect x="0" y="0" width="0" height="340">
+      <animate attributeName="width" values="0;900;900" keyTimes="0;0.55;1" dur="7s" repeatCount="indefinite"/>
+    </rect></clipPath>
+    <style>
+      text { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      .ax { font-size: 12px; fill: #7f93a8; }
+      .t { font-size: 17px; font-weight: 700; fill: #e6eef6; }
+      .lg { font-size: 13px; fill: #c9d6e2; }
+      .big { font-size: 28px; font-weight: 800; }
+    </style>
+  </defs>
+  <rect width="900" height="340" rx="16" fill="#0b1118"/>
+  <text x="56" y="32" class="t">Hit rate over time · mean of 4 fresh cultures each</text>
+  <line x1="56" x2="876" y1="292" y2="292" stroke="#223042"/>
+     <text x="46" y="296" class="ax" text-anchor="end">0%</text><line x1="56" x2="876" y1="233" y2="233" stroke="#223042"/>
+     <text x="46" y="237" class="ax" text-anchor="end">25%</text><line x1="56" x2="876" y1="174" y2="174" stroke="#223042"/>
+     <text x="46" y="178" class="ax" text-anchor="end">50%</text><line x1="56" x2="876" y1="115" y2="115" stroke="#223042"/>
+     <text x="46" y="119" class="ax" text-anchor="end">75%</text><line x1="56" x2="876" y1="56" y2="56" stroke="#223042"/>
+     <text x="46" y="60" class="ax" text-anchor="end">100%</text><text x="56" y="314" class="ax" text-anchor="middle">0</text><text x="329.3" y="314" class="ax" text-anchor="middle">500</text><text x="602.7" y="314" class="ax" text-anchor="middle">1000</text><text x="876" y="314" class="ax" text-anchor="middle">1500</text>
+  <text x="466" y="330" class="ax" text-anchor="middle">rallies played</text>
+  <g clip-path="url(#reveal)">
+    <path d="M56,208.2 L84.3,185.8 L112.6,178.7 L140.8,157.5 L169.1,146.9 L197.4,138.6 L225.7,148 L253.9,129.2 L282.2,138.6 L310.5,117.4 L338.8,115 L367,113.8 L395.3,104.4 L423.6,105.6 L451.9,96.1 L480.1,92.6 L508.4,73.7 L536.7,79.6 L565,69 L593.2,67.8 L621.5,66.6 L649.8,66.6 L678.1,65.4 L706.3,64.3 L734.6,63.1 L762.9,58.4 L791.2,60.7 L819.4,59.5 L847.7,57.2 L876,60.7 L876,292 L56,292 Z" fill="url(#fill)"/>
+    <path d="M56,247.2 L84.3,237.7 L112.6,229.5 L140.8,238.9 L169.1,253.1 L197.4,237.7 L225.7,229.5 L253.9,234.2 L282.2,244.8 L310.5,246 L338.8,243.6 L367,237.7 L395.3,246 L423.6,251.9 L451.9,233 L480.1,244.8 L508.4,229.5 L536.7,233 L565,250.7 L593.2,242.4 L621.5,235.4 L649.8,235.4 L678.1,248.3 L706.3,249.5 L734.6,236.5 L762.9,243.6 L791.2,242.4 L819.4,256.6 L847.7,234.2 L876,237.7" fill="none" stroke="#8899aa" stroke-width="2.5" stroke-dasharray="6 5"/>
+    <path d="M56,208.2 L84.3,185.8 L112.6,178.7 L140.8,157.5 L169.1,146.9 L197.4,138.6 L225.7,148 L253.9,129.2 L282.2,138.6 L310.5,117.4 L338.8,115 L367,113.8 L395.3,104.4 L423.6,105.6 L451.9,96.1 L480.1,92.6 L508.4,73.7 L536.7,79.6 L565,69 L593.2,67.8 L621.5,66.6 L649.8,66.6 L678.1,65.4 L706.3,64.3 L734.6,63.1 L762.9,58.4 L791.2,60.7 L819.4,59.5 L847.7,57.2 L876,60.7" fill="none" stroke="#4fe0a8" stroke-width="3.5" stroke-linejoin="round"/>
+    <circle cx="876" cy="60.7" r="6" fill="#4fe0a8"/>
+  </g>
+  <g transform="translate(606,136.2)">
+    <rect width="250" height="86" rx="12" fill="#121821" stroke="#223042"/>
+    <line x1="16" x2="40" y1="26" y2="26" stroke="#4fe0a8" stroke-width="3.5"/>
+    <text x="50" y="30" class="lg">beat on hit / noise on miss</text>
+    <line x1="16" x2="40" y1="56" y2="56" stroke="#8899aa" stroke-width="2.5" stroke-dasharray="6 5"/>
+    <text x="50" y="60" class="lg">no feedback (control)</text>
+  </g>
+  <text x="876" y="32" text-anchor="end" class="big" fill="#4fe0a8">36% to 98%</text>
+</svg>

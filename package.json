@@ -1,0 +1,14 @@
+{
+  "name": "dishpong",
+  "version": "1.0.0",
+  "description": "Pong played by a simulated culture of neurons that learns from a calm beat on hits and noise on misses, inspired by DishBrain.",
+  "main": "dish.js",
+  "scripts": {
+    "test": "node test-learning.js",
+    "media": "node tools/make-readme-media.js",
+    "start": "npx --yes serve ."
+  },
+  "keywords": ["pong", "neuroscience", "dishbrain", "free-energy-principle", "spiking-neural-network", "reinforcement-learning", "canvas", "web-audio"],
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/ASM010101/DishPong.git" }
+}

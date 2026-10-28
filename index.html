@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>DishPong — Pong that learns like neurons in a dish</title>
+<style>
+  :root {
+    --bg: #0b0f14; --panel: #121821; --line: #223042; --text: #d6e2ee; --dim: #7f93a8;
+    --sens: #5ad1ff; --hid: #b59cff; --up: #4fe0a8; --down: #ffb454; --miss: #ff5d6c; --calm: #6fb8ff;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 18px 24px 6px; }
+  h1 { margin: 0; font-size: 22px; letter-spacing: .3px; }
+  h1 span { color: var(--sens); }
+  header p { margin: 4px 0 0; color: var(--dim); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 16px 32px; }
+  .row { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 14px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+  .panel h2 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--dim); font-weight: 600; }
+  canvas { display: block; border-radius: 8px; max-width: 100%; }
+  .stage { position: relative; }
+  #overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+             background: rgba(5,8,12,.82); border-radius: 8px; cursor: pointer; text-align: center; padding: 20px; }
+  #overlay b { font-size: 20px; color: var(--sens); }
+  #overlay small { color: var(--dim); margin-top: 6px; max-width: 360px; }
+  #phase { margin-top: 8px; font-weight: 600; letter-spacing: .5px; min-height: 20px; }
+  .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  button { background: #1a2330; color: var(--text); border: 1px solid var(--line); border-radius: 8px;
+           padding: 7px 12px; font: inherit; cursor: pointer; }
+  button:hover { border-color: #3a5068; }
+  button.on { background: #173246; border-color: var(--sens); color: #fff; }
+  .sep { width: 1px; height: 24px; background: var(--line); margin: 0 4px; }
+  .stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
+  .stat { background: #0f141c; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+  .stat .k { color: var(--dim); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+  .stat .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--dim); font-size: 12px; margin-top: 8px; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
+  .explain { color: var(--dim); }
+  .explain b { color: var(--text); }
+  @media (max-width: 760px) { .stats { grid-template-columns: repeat(3, 1fr); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Dish<span>Pong</span></h1>
+    <p>A simulated culture of neurons learns Pong from feedback alone. A <b style="color:var(--calm)">hit</b> gets a calm, predictable beat. A <b style="color:var(--miss)">miss</b> gets random noise.</p>
+  </header>
+
+  <div class="row">
+    <div class="panel">
+      <h2>The game world</h2>
+      <div class="stage">
+        <canvas id="game" width="480" height="360"></canvas>
+        <div id="overlay">
+          <b>Click to wake the culture</b>
+          <small>Turn your sound on. At first the paddle wanders at random. Watch the hit rate climb as the dish learns. Use 16× or 64× to speed it up.</small>
+        </div>
+      </div>
+      <div id="phase"></div>
+    </div>
+    <div class="panel">
+      <h2>The dish</h2>
+      <canvas id="dish" width="380" height="360"></canvas>
+      <div class="legend">
+        <span><i class="dot" style="background:var(--sens)"></i>sensory</span>
+        <span><i class="dot" style="background:var(--hid)"></i>culture</span>
+        <span><i class="dot" style="background:var(--up)"></i>motor up</span>
+        <span><i class="dot" style="background:var(--down)"></i>motor down</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="panel" style="flex:1">
+      <div class="controls">
+        <button id="play">Pause</button>
+        <span class="sep"></span>
+        <span style="color:var(--dim)">Speed</span>
+        <button data-speed="1">1×</button>
+        <button data-speed="4" class="on">4×</button>
+        <button data-speed="16">16×</button>
+        <button data-speed="64">64×</button>
+        <span class="sep"></span>
+        <button id="feedback" class="on" title="Turn off to run the control experiment: no feedback, no learning">Feedback: ON</button>
+        <button id="sound" class="on">Sound: ON</button>
+        <span class="sep"></span>
+        <button id="reset" title="Start over with a brand-new random culture">New culture</button>
+      </div>
+      <div class="stats" style="margin-top:12px">
+        <div class="stat"><div class="k">Hit rate (last 50)</div><div class="v" id="sRate">–</div></div>
+        <div class="stat"><div class="k">Hits</div><div class="v" id="sHits">0</div></div>
+        <div class="stat"><div class="k">Misses</div><div class="v" id="sMiss">0</div></div>
+        <div class="stat"><div class="k">Rally</div><div class="v" id="sRally">0</div></div>
+        <div class="stat"><div class="k">Best rally</div><div class="v" id="sBest">0</div></div>
+        <div class="stat"><div class="k">Dish time</div><div class="v" id="sTime">0:00</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="panel" style="flex:1 1 520px">
+      <h2>Learning curve · hit % per 20 rallies</h2>
+      <canvas id="curve" width="560" height="170"></canvas>
+    </div>
+    <div class="panel" style="flex:1 1 380px">
+      <h2>What the dish has learned · sensory-to-motor bias</h2>
+      <canvas id="map" width="400" height="170"></canvas>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="panel explain" style="flex:1">
+      <h2>How it works</h2>
+      <p>This is based on <b>DishBrain</b> (Kagan et al., <i>Neuron</i> 2022), where real neurons grown on an electrode array learned to play Pong. No one told the cells to hit the ball. Hits got <b>predictable</b> stimulation and misses got <b>unpredictable</b> stimulation. The cells changed so their world became predictable, and playing well does that.</p>
+      <p><b>Sensory electrodes</b> fire at places that encode the ball's height, the paddle's height, and where the ball is relative to the paddle. They fire faster as the ball gets closer. A small recurrent <b>culture</b> sits in between. Two <b>motor regions</b> push the paddle up or down. The paddle moves according to which region is more active.</p>
+      <p>On its own, the culture fires in drifting <b>spontaneous bursts</b>, and each synapse keeps a short-lived <b>trace</b> of "this input was active while the culture pushed up or down". A hit sends a <b style="color:var(--calm)">calm, synchronous beat</b> that strengthens the recent traces. A miss sends <b style="color:var(--miss)">random noise</b> that weakens and shakes up the recent traces. Synaptic scaling keeps total input steady, and the bursts calm down as hits become expected.</p>
+      <p>Click <b>Feedback: OFF</b> for the control condition. With no stimulation the culture can't learn, so it stays near chance (~20%).</p>
+    </div>
+  </div>
+</div>
+
+<script src="dish.js"></script>
+<script>
+(() => {
+  'use strict';
+  const C = Dish.CONST;
+  let dish = new Dish();
+  let speed = 4, running = false, soundOn = true;
+
+  // ---------------------------------------------------------------- audio
+  let actx = null, master = null, noiseBuf = null, lastSound = 0;
+  function initAudio() {
+    if (actx) return;
+    actx = new (window.AudioContext || window.webkitAudioContext)();
+    master = actx.createGain(); master.gain.value = 0.6; master.connect(actx.destination);
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  function canPlay(gap) {
+    if (!soundOn || !actx) return false;
+    const now = actx.currentTime;
+    if (now - lastSound < gap) return false;
+    lastSound = now; return true;
+  }
+  function playNoise() {
+    if (!canPlay(0.25)) return;
+    const dur = Math.max(0.15, C.NOISE_TICKS / 60 / speed);
+    const t = actx.currentTime;
+    const src = actx.createBufferSource(); src.buffer = noiseBuf;
+    const g = actx.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.22, t + 0.02);
+    g.gain.setValueAtTime(0.22, t + dur * 0.7);
+    g.gain.linearRampToValueAtTime(0, t + dur);
+    src.connect(g).connect(master);
+    src.start(t); src.stop(t + dur + 0.05);
+  }
+  function playCalm() {
+    if (!canPlay(speed > 4 ? 0.5 : 0.2)) return;
+    const t0 = actx.currentTime;
+    const beats = speed > 4 ? 1 : 3, gap = 0.16;
+    for (let b = 0; b < beats; b++) {
+      const t = t0 + b * gap;
+      const o = actx.createOscillator(), g = actx.createGain();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(196, t);              // soft G3 "heartbeat" thump
+      o.frequency.exponentialRampToValueAtTime(130, t + 0.14);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.32, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+      o.connect(g).connect(master);
+      o.start(t); o.stop(t + 0.25);
+    }
+  }
+
+  // --------------------------------------------------------- dish layout
+  const DW = 380, DH = 360, CX = 190, CY = 180, R = 165;
+  let pos = null;
+  function layout() {
+    const { NS, NH, NM, NU } = dish;
+    const S = [], H = [], M = [];
+    for (let i = 0; i < NS; i++) {            // sensory electrodes on the left arc
+      const a = Math.PI * (0.62 + 0.76 * (i / (NS - 1)));
+      S.push([CX + Math.cos(a) * (R - 22), CY - Math.sin(a) * (R - 22)]);
+    }
+    let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let k = 0; k < NH; k++) {            // culture scattered in the middle
+      const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * 70;
+      H.push([CX - 10 + Math.cos(a) * r, CY + Math.sin(a) * r]);
+    }
+    for (let j = 0; j < NM; j++) {            // motor clusters on the right
+      const up = j < NU, q = j % NU;
+      const a = q * 2.4, r = 6 + 4.2 * Math.sqrt(q);
+      M.push([CX + 112 + Math.cos(a) * r * 1.6, CY + (up ? -62 : 62) + Math.sin(a) * r * 1.6]);
+    }
+    pos = { S, H, M };
+  }
+  layout();
+  let gS, gH, gM;
+  function resetGlow() {
+    gS = new Float32Array(dish.NS); gH = new Float32Array(dish.NH); gM = new Float32Array(dish.NM);
+  }
+  resetGlow();
+
+  // -------------------------------------------------------------- canvases
+  const gctx = document.getElementById('game').getContext('2d');
+  const dctx = document.getElementById('dish').getContext('2d');
+  const cctx = document.getElementById('curve').getContext('2d');
+  const mctx = document.getElementById('map').getContext('2d');
+
+  // pre-rendered TV static frames
+  const statics = [];
+  for (let f = 0; f < 6; f++) {
+    const c = document.createElement('canvas'); c.width = 160; c.height = 120;
+    const x = c.getContext('2d'), img = x.createImageData(160, 120);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const v = Math.random() * 255;
+      img.data[i] = v; img.data[i + 1] = v * 0.85; img.data[i + 2] = v * 0.9; img.data[i + 3] = 255;
+    }
+    x.putImageData(img, 0, 0); statics.push(c);
+  }
+
+  let hitFlash = 0, missFlash = 0, calmRing = 0;
+
+  function drawGame() {
+    const W = C.GW, H = C.GH, g = gctx;
+    g.fillStyle = '#070b10'; g.fillRect(0, 0, W, H);
+    // walls (top, bottom, right)
+    g.strokeStyle = '#2a3b50'; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(0, 2); g.lineTo(W - 2, 2); g.lineTo(W - 2, H - 2); g.lineTo(0, H - 2); g.stroke();
+    // faint grid of the 8 place-code bands
+    g.strokeStyle = 'rgba(90,209,255,0.05)'; g.lineWidth = 1;
+    for (let i = 1; i < 8; i++) { g.beginPath(); g.moveTo(0, i * H / 8); g.lineTo(W, i * H / 8); g.stroke(); }
+
+    if (dish.phase === 'noise') {
+      g.globalAlpha = 0.55;
+      g.imageSmoothingEnabled = false;
+      g.drawImage(statics[(Math.random() * statics.length) | 0], 0, 0, W, H);
+      g.globalAlpha = 1;
+      g.fillStyle = 'rgba(255,60,80,0.18)'; g.fillRect(0, 0, W, H);
+    } else if (dish.phase === 'pause') {
+      g.fillStyle = 'rgba(255,255,255,0.03)'; g.fillRect(0, 0, W, H);
+    }
+
+    // paddle
+    const py = dish.paddleY - C.PAD_H / 2;
+    if (hitFlash > 0) {
+      g.shadowColor = '#6fb8ff'; g.shadowBlur = 30 * hitFlash;
+    }
+    g.fillStyle = hitFlash > 0 ? '#bfe0ff' : '#e8f1fa';
+    roundRect(g, C.PAD_X, py, C.PAD_W, C.PAD_H, 3); g.fill();
+    g.shadowBlur = 0;
+
+    // ball
+    if (dish.phase === 'play') {
+      g.fillStyle = '#fff';
+      g.beginPath(); g.arc(dish.ballX, dish.ballY, C.BALL_R, 0, Math.PI * 2); g.fill();
+    }
+
+    // event text
+    g.textAlign = 'center'; g.font = '600 15px system-ui, sans-serif';
+    if (dish.phase === 'noise') { g.fillStyle = '#ffd0d5'; g.fillText('MISS · unpredictable noise', W / 2, 34); }
+    else if (dish.phase === 'pause') { g.fillStyle = '#8899aa'; g.fillText('MISS · (no feedback)', W / 2, 34); }
+    else if (hitFlash > 0) {
+      g.globalAlpha = Math.min(1, hitFlash * 1.5);
+      g.fillStyle = '#bfe0ff'; g.fillText('HIT · calm beat', W / 2, 34);
+      g.globalAlpha = 1;
+    }
+  }
+
+  function roundRect(g, x, y, w, h, r) {
+    g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+    g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+  }
+
+  function drawDish() {
+    const g = dctx, { NS, NH, NM, NU, Ws, wMax } = dish;
+    g.clearRect(0, 0, DW, DH);
+    // petri dish
+    const grad = g.createRadialGradient(CX, CY, 20, CX, CY, R);
+    if (dish.phase === 'noise') { grad.addColorStop(0, '#2a1218'); grad.addColorStop(1, '#170a0f'); }
+    else { grad.addColorStop(0, '#13202c'); grad.addColorStop(1, '#0c141c'); }
+    g.fillStyle = grad; g.beginPath(); g.arc(CX, CY, R, 0, Math.PI * 2); g.fill();
+    g.strokeStyle = '#2c4054'; g.lineWidth = 3; g.stroke();
+    g.strokeStyle = 'rgba(255,255,255,0.05)'; g.lineWidth = 1;
+    g.beginPath(); g.arc(CX, CY, R - 8, 0, Math.PI * 2); g.stroke();
+
+    // calm-beat ring
+    if (calmRing > 0) {
+      g.strokeStyle = `rgba(111,184,255,${0.5 * calmRing})`; g.lineWidth = 3;
+      g.beginPath(); g.arc(CX, CY, R - 4 - (1 - calmRing) * 40, 0, Math.PI * 2); g.stroke();
+    }
+
+    // sensory → motor synapses, brightness = learned strength
+    g.lineWidth = 1;
+    for (let i = 0; i < NS; i++) {
+      for (let j = 0; j < NM; j++) {
+        const w = Ws[i * NM + j] / wMax;
+        if (w < 0.06) continue;
+        const a = Math.min(0.55, w * 1.4) * (0.35 + 0.65 * gS[i]);
+        g.strokeStyle = j < NU ? `rgba(79,224,168,${a})` : `rgba(255,180,84,${a})`;
+        g.beginPath(); g.moveTo(pos.S[i][0], pos.S[i][1]); g.lineTo(pos.M[j][0], pos.M[j][1]); g.stroke();
+      }
+    }
+
+    const neuron = (p, glow, rgb, r) => {
+      g.fillStyle = `rgba(${rgb},${0.22 + 0.78 * glow})`;
+      if (glow > 0.5) { g.shadowColor = `rgb(${rgb})`; g.shadowBlur = 10 * glow; }
+      g.beginPath(); g.arc(p[0], p[1], r, 0, Math.PI * 2); g.fill();
+      g.shadowBlur = 0;
+    };
+    for (let k = 0; k < NH; k++) neuron(pos.H[k], gH[k], '181,156,255', 3);
+    for (let i = 0; i < NS; i++) neuron(pos.S[i], gS[i], '90,209,255', 4.5);
+    for (let j = 0; j < NM; j++) neuron(pos.M[j], gM[j], j < NU ? '79,224,168' : '255,180,84', 4.5);
+
+    // noise speckles
+    if (dish.phase === 'noise') {
+      g.fillStyle = 'rgba(255,120,140,0.6)';
+      for (let n = 0; n < 60; n++) {
+        const a = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * (R - 10);
+        g.fillRect(CX + Math.cos(a) * r, CY + Math.sin(a) * r, 2, 2);
+      }
+    }
+
+    // labels
+    g.font = '600 10px system-ui, sans-serif'; g.fillStyle = '#7f93a8'; g.textAlign = 'center';
+    g.fillText('SENSORY', CX - R + 38, CY + 4);
+    g.fillText('MOTOR UP', pos.M[0][0], pos.M[0][1] - 30);
+    g.fillText('MOTOR DOWN', pos.M[NU][0], pos.M[NU][1] + 38);
+    g.fillText('CULTURE', CX - 10, CY + 92);
+  }
+
+  function drawCurve() {
+    const g = cctx, W = g.canvas.width, H = g.canvas.height, pad = 28;
+    g.clearRect(0, 0, W, H);
+    g.strokeStyle = '#223042'; g.lineWidth = 1; g.font = '10px system-ui'; g.fillStyle = '#7f93a8'; g.textAlign = 'right';
+    for (const v of [0, 0.25, 0.5, 0.75, 1]) {
+      const y = H - 14 - v * (H - 24);
+      g.beginPath(); g.moveTo(pad, y); g.lineTo(W - 6, y); g.stroke();
+      g.fillText((v * 100) + '%', pad - 4, y + 3);
+    }
+    // chance line (~20%)
+    const cy = H - 14 - 0.2 * (H - 24);
+    g.setLineDash([4, 4]); g.strokeStyle = '#55657a';
+    g.beginPath(); g.moveTo(pad, cy); g.lineTo(W - 6, cy); g.stroke(); g.setLineDash([]);
+    g.textAlign = 'left'; g.fillText('chance', W - 50, cy - 4);
+
+    const pts = dish.stats.curve;
+    if (pts.length < 1) {
+      g.textAlign = 'center'; g.fillText('waiting for the first 20 rallies…', W / 2, H / 2); return;
+    }
+    const n = Math.max(pts.length, 10), dx = (W - pad - 10) / (n - 1 || 1);
+    g.lineWidth = 2;
+    for (let i = 0; i < pts.length; i++) {
+      const x = pad + i * dx, y = H - 14 - pts[i].rate * (H - 24);
+      g.fillStyle = pts[i].feedback ? '#4fe0a8' : '#8899aa';
+      if (i > 0) {
+        const px = pad + (i - 1) * dx, py = H - 14 - pts[i - 1].rate * (H - 24);
+        g.strokeStyle = pts[i].feedback ? '#4fe0a8' : '#8899aa';
+        g.beginPath(); g.moveTo(px, py); g.lineTo(x, y); g.stroke();
+      }
+      if (pts.length < 80) { g.beginPath(); g.arc(x, y, 2.5, 0, Math.PI * 2); g.fill(); }
+    }
+  }
+
+  function drawMap() {
+    const g = mctx, W = g.canvas.width, H = g.canvas.height;
+    g.clearRect(0, 0, W, H);
+    const m = dish.sensoryMap(), NB = dish.NB;
+    let mx = 0.02; for (const v of m) mx = Math.max(mx, Math.abs(v));
+    const groups = ['ball height', 'paddle height', 'ball vs paddle'];
+    const gw = (W - 20) / 3, mid = H / 2 - 6, amp = mid - 22;
+    g.strokeStyle = '#223042'; g.beginPath(); g.moveTo(6, mid); g.lineTo(W - 6, mid); g.stroke();
+    g.font = '10px system-ui'; g.textAlign = 'center';
+    for (let gi = 0; gi < 3; gi++) {
+      const x0 = 10 + gi * gw, bw = (gw - 16) / NB;
+      for (let b = 0; b < NB; b++) {
+        const v = m[gi * NB + b] / mx, x = x0 + 4 + b * bw, h = v * amp;
+        g.fillStyle = v >= 0 ? '#4fe0a8' : '#ffb454';
+        g.fillRect(x, v >= 0 ? mid - h : mid, bw - 2, Math.abs(h));
+      }
+      g.fillStyle = '#7f93a8';
+      g.fillText(groups[gi], x0 + gw / 2 - 4, H - 18);
+      g.fillText(gi === 2 ? 'above ... below' : 'top ... bottom', x0 + gw / 2 - 4, H - 5);
+    }
+    g.textAlign = 'left'; g.fillStyle = '#4fe0a8'; g.fillText('green = pushes up', 8, 12);
+    g.textAlign = 'right'; g.fillStyle = '#ffb454'; g.fillText('orange = pushes down', W - 8, 12);
+  }
+
+  // -------------------------------------------------------------- stats UI
+  const $ = (id) => document.getElementById(id);
+  const phaseEl = $('phase');
+  function updateStats() {
+    const s = dish.stats, ev = s.events.length;
+    $('sRate').textContent = ev ? Math.round(dish.hitRate(50) * 100) + '%' : '–';
+    $('sHits').textContent = s.hits;
+    $('sMiss').textContent = s.misses;
+    $('sRally').textContent = s.rally;
+    $('sBest').textContent = s.bestRally;
+    const sec = Math.floor(dish.t / 60);
+    $('sTime').textContent = Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+    if (!running) { phaseEl.textContent = 'Paused'; phaseEl.style.color = '#7f93a8'; }
+    else if (dish.phase === 'noise') { phaseEl.textContent = 'Noise: random stimulation after a miss'; phaseEl.style.color = 'var(--miss)'; }
+    else if (dish.phase === 'pause') { phaseEl.textContent = 'Silence: feedback is off (control)'; phaseEl.style.color = '#8899aa'; }
+    else if (dish.calmT > 0) { phaseEl.textContent = 'Calm beat: predictable stimulation after a hit'; phaseEl.style.color = 'var(--calm)'; }
+    else { phaseEl.textContent = 'Playing: sensory electrodes are reporting the ball'; phaseEl.style.color = 'var(--sens)'; }
+  }
+
+  // ------------------------------------------------------------- main loop
+  let lastStats = 0;
+  function frame(ts) {
+    if (running) {
+      for (let k = 0; k < speed; k++) {
+        dish.step();
+        for (let i = 0; i < dish.NS; i++) gS[i] = Math.max(gS[i] * 0.8, dish.s[i]);
+        for (let i = 0; i < dish.NH; i++) gH[i] = Math.max(gH[i] * 0.8, dish.h[i]);
+        for (let i = 0; i < dish.NM; i++) gM[i] = Math.max(gM[i] * 0.8, dish.m[i]);
+        if (dish.lastEvent === 'hit') {
+          hitFlash = 1;
+          if (dish.feedback) { calmRing = 1; playCalm(); }
+        } else if (dish.lastEvent === 'miss') {
+          missFlash = 1;
+          if (dish.feedback) playNoise();
+        }
+      }
+      hitFlash = Math.max(0, hitFlash - 0.03);
+      missFlash = Math.max(0, missFlash - 0.03);
+      calmRing = Math.max(0, calmRing - 0.035);
+    }
+    drawGame();
+    drawDish();
+    if (ts - lastStats > 120) { updateStats(); drawCurve(); drawMap(); lastStats = ts; }
+    requestAnimationFrame(frame);
+  }
+
+  // -------------------------------------------------------------- controls
+  const playBtn = $('play');
+  function setRunning(r) {
+    running = r;
+    playBtn.textContent = r ? 'Pause' : 'Play';
+    if (r && actx && actx.state === 'suspended') actx.resume();
+  }
+  $('overlay').addEventListener('click', () => {
+    initAudio(); actx.resume();
+    $('overlay').remove(); setRunning(true);
+  });
+  playBtn.addEventListener('click', () => { if (!$('overlay')) setRunning(!running); });
+  document.querySelectorAll('[data-speed]').forEach((b) => b.addEventListener('click', () => {
+    speed = +b.dataset.speed;
+    document.querySelectorAll('[data-speed]').forEach((x) => x.classList.toggle('on', x === b));
+  }));
+  $('feedback').addEventListener('click', (e) => {
+    dish.feedback = !dish.feedback;
+    e.target.textContent = 'Feedback: ' + (dish.feedback ? 'ON' : 'OFF');
+    e.target.classList.toggle('on', dish.feedback);
+  });
+  $('sound').addEventListener('click', (e) => {
+    soundOn = !soundOn;
+    e.target.textContent = 'Sound: ' + (soundOn ? 'ON' : 'OFF');
+    e.target.classList.toggle('on', soundOn);
+  });
+  $('reset').addEventListener('click', () => {
+    const fb = dish.feedback;
+    dish = new Dish(); dish.feedback = fb;
+    resetGlow();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && !$('overlay')) { e.preventDefault(); setRunning(!running); }
+  });
+
+  // Handy from the devtools console: dishpong.dish.hitRate(), dishpong.train(100000) …
+  window.dishpong = {
+    get dish() { return dish; },
+    train(steps) { for (let i = 0; i < steps; i++) dish.step(); },
+  };
+
+  updateStats(); drawCurve(); drawMap();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
